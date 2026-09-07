@@ -1,0 +1,25 @@
+server:
+  name: local-log-sentinel
+  description: Extracts recent application errors from local logs
+
+tools:
+  - name: get_last_error
+    description: Returns the most recent application error
+
+    input:
+      log_path:
+        type: string
+        default: "./logs/app.log"
+
+      lines:
+        type: integer
+        default: 100
+        min: 1
+        max: 1000
+
+    execution:
+      runtime: node
+      timeout: 5s
+
+    action: 
+        type: filesystem.tail

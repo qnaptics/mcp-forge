@@ -1,0 +1,33 @@
+{
+  "name": "mcp-forge",
+  "version": "0.1.0",
+  "description": "Build MCP servers from declarative definitions",
+  "main": "dist/cli/index.js",
+  "bin": {
+    "mcp-forge": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x dist/cli/index.js",
+    "dev": "tsx src/cli/index.ts",
+    "test": "node --test"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai-agents",
+    "developer-tools"
+  ],
+  "author": "Ashutosh Zade",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "yaml": "^2.9.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1"
+  }
+}
