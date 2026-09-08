@@ -8,8 +8,9 @@ tools:
 
     input:
       log_path:
-        type: string
-        default: "./logs/app.log"
+        type: path
+        env: APP_LOG_PATH
+        required: true
 
       lines:
         type: integer
@@ -21,5 +22,5 @@ tools:
       runtime: node
       timeout: 5s
 
-    action: 
-        type: filesystem.tail
+    action:
+      type: filesystem.tail

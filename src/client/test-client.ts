@@ -33,8 +33,9 @@ export async function testMCPServer(
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [serverPath],
-    cwd: outputDir
-  });
+    cwd: outputDir,
+    env: process.env as Record<string, string>
+});
 
   const client = new Client({
     name: "mcp-forge-test-client",
@@ -139,7 +140,6 @@ async function main(): Promise<void> {
     outputDir,
     "get_last_error",
     {
-      log_path: "./logs/app.log",
       lines: 10
     }
   );

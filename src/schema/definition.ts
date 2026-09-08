@@ -19,10 +19,12 @@
 import { z } from "zod";
 
 const InputDefinition = z.object({
-  type: z.enum(["string", "integer", "number", "boolean"]),
+  type: z.enum(["string", "integer", "number", "boolean", "path"]),
   default: z.unknown().optional(),
   min: z.number().optional(),
-  max: z.number().optional()
+  max: z.number().optional(),
+  env: z.string().min(1).optional(),
+  required: z.boolean().optional()
 });
 
 const ActionDefinition = z.object({

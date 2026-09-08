@@ -13,10 +13,11 @@
  *
  * Licensed under the MIT License.
  * See the LICENSE file in the project root for license information.
+ * 
  *
  **/
 
-import fs from "node:fs";
+ import fs from "node:fs";
 import path from "node:path";
 import type { MCPDefinition } from "../schema/definition";
 
@@ -82,7 +83,7 @@ const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio
 
 const server = new McpServer({
   name: ${JSON.stringify(definition.server.name)},
-  version: "0.1.0"
+  version: "0.2.0"
 });
 
 ${toolRegistrations}
@@ -106,7 +107,7 @@ function generateAction(
 
   switch (actionType) {
     case "filesystem.tail":
-      return generateFilesystemTail();
+      return generateFilesystemTail(tool);
 
     default:
       return `
@@ -126,31 +127,100 @@ function generateAction(
   }
 }
 
-function generateFilesystemTail(): string {
+function generateFilesystemTail(
+  tool: MCPDefinition["tools"][number]
+): string {
+  const logPathInput = tool.input?.log_path;
+
+  const envVariable = logPathInput?.env;
+  const required = logPathInput?.required === true;
+
+  const environmentResolution = envVariable
+    ? `
+      const envValue = process.env[${JSON.stringify(envVariable)}];
+
+      if (
+        (args.log_path === undefined || args.log_path === null || args.log_path === "") &&
+        envValue !== undefined &&
+        envValue !== ""
+      ) {
+        args.log_path = envValue;
+      }
+`
+    : "";
+
+  const requiredValidation = required
+    ? `
+      if (
+        args.log_path === undefined ||
+        args.log_path === null ||
+        args.log_path === ""
+      ) {
+        throw new Error(
+          ${JSON.stringify(
+            envVariable
+              ? `Missing required input "log_path". Provide it as a tool argument or set ${envVariable}.`
+              : `Missing required input "log_path".`
+          )}
+        );
+      }
+`
+    : "";
+
   return `
     try {
+${environmentResolution}
+${requiredValidation}
+
       const requestedPath = args.log_path;
       const requestedLines = args.lines;
 
-      const root = process.cwd();
-      const resolvedPath = path.resolve(root, requestedPath);
-      const relativePath = path.relative(root, resolvedPath);
-
-      // Prevent filesystem traversal outside the generated server directory.
-      if (
-        relativePath.startsWith("..") ||
-        path.isAbsolute(relativePath)
-      ) {
-        throw new Error("Access denied: path must remain inside the working directory.");
+      if (typeof requestedPath !== "string") {
+        throw new Error("Invalid input: log_path must be a string.");
       }
 
-      const contents = await fs.readFile(resolvedPath, "utf8");
+      if (
+        typeof requestedLines !== "number" ||
+        !Number.isInteger(requestedLines) ||
+        requestedLines < 1
+      ) {
+        throw new Error("Invalid input: lines must be an integer greater than or equal to 1.");
+      }
+
+      const root = process.cwd();
+
+      let resolvedPath;
+
+      if (path.isAbsolute(requestedPath)) {
+        resolvedPath = path.normalize(requestedPath);
+      } else {
+        const relativePath = path.normalize(requestedPath);
+
+        // Prevent relative path traversal outside the working directory.
+        if (
+          relativePath === ".." ||
+          relativePath.startsWith(".." + path.sep)
+        ) {
+          throw new Error(
+            "Access denied: relative path must remain inside the working directory."
+          );
+        }
+
+        resolvedPath = path.resolve(root, relativePath);
+      }
+
+      const contents = await fs.readFile(
+        resolvedPath,
+        "utf8"
+      );
 
       const lines = contents
         .split(/\\r?\\n/)
         .filter((line) => line.length > 0);
 
-      const tail = lines.slice(-requestedLines);
+      const tail = lines.slice(
+        -requestedLines
+      );
 
       return {
         content: [
@@ -186,6 +256,8 @@ function generateInputSchema(
       default?: unknown;
       min?: number;
       max?: number;
+      env?: string;
+      required?: boolean;
     }
   > | undefined
 ): string {
@@ -213,8 +285,30 @@ function generateInputSchema(
         expression += `.max(${definition.max})`;
       }
 
+      if (definition.type === "number") {
+        if (definition.min !== undefined) {
+          expression += `.min(${definition.min})`;
+        }
+
+        if (definition.max !== undefined) {
+          expression += `.max(${definition.max})`;
+        }
+      }
+
       if (definition.default !== undefined) {
         expression += `.default(${JSON.stringify(definition.default)})`;
+      }
+
+      /*
+       * Environment-backed inputs are optional from the MCP caller's
+       * perspective because the generated server can resolve them from
+       * process.env.
+       *
+       * Required validation happens at runtime after environment
+       * resolution.
+       */
+      if (definition.env || definition.required !== true) {
+        expression += `.optional()`;
       }
 
       return `    ${JSON.stringify(name)}: ${expression}`;
@@ -229,6 +323,9 @@ function generateInputSchema(
 function getZodType(type: string): string {
   switch (type) {
     case "string":
+      return "z.string()";
+
+    case "path":
       return "z.string()";
 
     case "integer":
@@ -251,7 +348,7 @@ function generatePackageJson(
   return JSON.stringify(
     {
       name: definition.server.name,
-      version: "0.1.0",
+      version: "0.2.0",
       private: true,
       description: definition.server.description,
       main: "server.js",
@@ -270,11 +367,58 @@ function generateReadme(
   definition: MCPDefinition
 ): string {
   const tools = definition.tools
-    .map(
-      (tool) =>
-        `### ${tool.name}\n\n${tool.description}\n`
-    )
+    .map((tool) => {
+      const inputs = Object.entries(tool.input ?? {})
+        .map(([name, input]) => {
+          const envText = input.env
+            ? ` — environment variable: \`${input.env}\``
+            : "";
+
+          const requiredText = input.required
+            ? " — required"
+            : "";
+
+          const defaultText =
+            input.default !== undefined
+              ? ` — default: \`${String(input.default)}\``
+              : "";
+
+          return `- \`${name}\` (${input.type})${envText}${requiredText}${defaultText}`;
+        })
+        .join("\n");
+
+      return `### ${tool.name}
+
+${tool.description}
+
+${inputs ? `Inputs:\n\n${inputs}\n` : ""}
+`;
+    })
     .join("\n");
+
+  const environmentVariables = definition.tools
+    .flatMap((tool) =>
+      Object.entries(tool.input ?? {})
+        .filter(([, input]) => input.env)
+        .map(([name, input]) => ({
+          name,
+          env: input.env as string
+        }))
+    );
+
+  const environmentSection =
+    environmentVariables.length > 0
+      ? `
+## Environment Variables
+
+${environmentVariables
+  .map(
+    ({ name, env }) =>
+      `- \`${env}\` — provides the value for \`${name}\` when the tool caller does not provide it`
+  )
+  .join("\n")}
+`
+      : "";
 
   return `# ${definition.server.name}
 
@@ -283,13 +427,19 @@ ${definition.server.description}
 ## Tools
 
 ${tools}
-
+${environmentSection}
 ## Run
 
 Install dependencies:
 
 \`\`\`bash
 npm install
+\`\`\`
+
+Set required environment variables if needed:
+
+\`\`\`bash
+export APP_LOG_PATH="/absolute/path/to/app.log"
 \`\`\`
 
 Start the MCP server:
