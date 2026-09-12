@@ -88,6 +88,24 @@ export async function testMCPServer(
         error: "Tool returned an empty result"
       };
     }
+    
+    const requiredEvidence = [
+  '"root"',
+  '"fileCount"',
+  '"files"'
+];
+
+for (const field of requiredEvidence) {
+  if (!resultText.includes(field)) {
+    return {
+      success: false,
+      toolsFound,
+      error: `Architecture result missing required evidence field: ${field}`
+    };
+  }
+}
+
+console.log("✓ Architecture evidence validated");
 
     console.log("✓ Result validated");
 
@@ -138,9 +156,9 @@ async function main(): Promise<void> {
   const result = await testMCPServer(
     serverPath,
     outputDir,
-    "get_last_error",
+    "understand_architecture",
     {
-      lines: 10
+      root_path: process.env.PROJECT_ROOT ?? process.cwd()
     }
   );
 

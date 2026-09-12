@@ -109,6 +109,9 @@ function generateAction(
     case "filesystem.tail":
       return generateFilesystemTail(tool);
 
+  case "code.understand_architecture":
+    return generateUnderstandArchitecture();
+
     default:
       return `
     return {
@@ -227,6 +230,104 @@ ${requiredValidation}
           {
             type: "text",
             text: tail.join("\\n")
+          }
+        ]
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              error: error instanceof Error
+                ? error.message
+                : String(error)
+            }, null, 2)
+          }
+        ],
+        isError: true
+      };
+    }
+`;
+}
+
+function generateUnderstandArchitecture(): string {
+  return `
+    try {
+      const requestedPath = args.root_path;
+      const root = path.resolve(requestedPath);
+
+      const ignoredDirectories = new Set([
+        ".git",
+        "node_modules",
+        "dist",
+        "build",
+        "coverage",
+        ".next",
+        ".cache"
+      ]);
+
+      const supportedExtensions = new Set([
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx",
+        ".py",
+        ".go",
+        ".java",
+        ".rs",
+        ".cpp",
+        ".c",
+        ".cs",
+        ".rb",
+        ".php",
+        ".sql",
+        ".yaml",
+        ".yml",
+        ".json",
+        ".md"
+      ]);
+
+      const files = [];
+
+      async function walk(currentPath) {
+        const entries = await fs.readdir(currentPath, {
+          withFileTypes: true
+        });
+
+        for (const entry of entries) {
+          if (ignoredDirectories.has(entry.name)) {
+            continue;
+          }
+
+          const fullPath = path.join(currentPath, entry.name);
+
+          if (entry.isDirectory()) {
+            await walk(fullPath);
+            continue;
+          }
+
+          if (supportedExtensions.has(path.extname(entry.name))) {
+            files.push(path.relative(root, fullPath));
+          }
+        }
+      }
+
+      await walk(root);
+
+      files.sort();
+
+      const inventory = {
+        root,
+        fileCount: files.length,
+        files: files.slice(0, 500)
+      };
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(inventory, null, 2)
           }
         ]
       };

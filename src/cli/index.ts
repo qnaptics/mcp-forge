@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /*
  **
  * MCP Forge
@@ -15,8 +16,6 @@
  * See the LICENSE file in the project root for license information.
  *
  **/
-
-#!/usr/bin/env node
 
 import fs from "node:fs";
 import path from "node:path";

@@ -1,0 +1,16 @@
+src/
+examples/
+tests/
+.vscode/
+.git/
+.github/
+
+dist/client/
+dist/local-log-sentinel/
+dist/project-intelligence/
+
+logs/
+phases/
+scripts/
+docs/
+vision.md

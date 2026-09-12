@@ -29,7 +29,8 @@ const InputDefinition = z.object({
 
 const ActionDefinition = z.object({
   type: z.enum([
-    "filesystem.tail"
+    "filesystem.tail",
+    "code.understand_architecture"
   ])
 });
 

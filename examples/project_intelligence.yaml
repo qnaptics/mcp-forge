@@ -1,0 +1,20 @@
+server:
+  name: project-intelligence
+  description: Understand the architecture and structure of a local codebase
+
+tools:
+  - name: understand_architecture
+    description: Analyze the current codebase and explain its architecture, major components, interactions, and business logic
+
+    input:
+      root_path:
+        type: path
+        env: PROJECT_ROOT
+        required: true
+
+    execution:
+      runtime: node
+      timeout: 30s
+
+    action:
+      type: code.understand_architecture
