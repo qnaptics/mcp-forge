@@ -1,6 +1,6 @@
 {
-  "name": "mcp-forge",
-  "version": "0.1.0",
+  "name": "@qnaptics/mcp-forge",
+  "version": "0.1.1",
   "description": "Build MCP servers from declarative definitions",
   "main": "dist/cli/index.js",
   "bin": {
